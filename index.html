@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>练字计时器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npmleancloud/av-min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #F5F0E6;
+            --bg-secondary: #EDE6D6;
+            --text-primary: #2D2D2D;
+            --text-secondary: #5A5A5A;
+            --accent: #8B7355;
+            --accent-light: #A69076;
+            --border: #D4C5B0;
+            --shadow: rgba(45, 45, 45, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Serif SC', serif;
+            background: linear-gradient(135deg, #E8E0D0 0%, #F5F0E6 50%, #F0EBE1 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='paperTexture'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.03' numOctaves='4'/%3E%3CfeDiffuseLighting lighting-color='%23F5F0E6' surfaceScale='1'%3E%3CfeDistantLight azimuth='45' elevation='50'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paperTexture)' opacity='0.4'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 5%;
+            right: 5%;
+            width: 25%;
+            height: 35%;
+            background: radial-gradient(ellipse at center, rgba(139, 115, 85, 0.06) 0%, transparent 70%);
+            transform: rotate(-20deg);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            background: transparent;
+        }
+
+        .menu-btn {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            gap: 5px;
+        }
+
+        .menu-btn span {
+            width: 24px;
+            height: 2px;
+            background: var(--text-primary);
+            transition: all 0.3s;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .sync-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            color: #8B7355;
+            opacity: 0.7;
+        }
+
+        .sync-status.syncing {
+            animation: syncSpin 1s linear infinite;
+        }
+
+        .sync-status.synced {
+            color: #4CAF50;
+            opacity: 1;
+        }
+
+        @keyframes syncSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .user-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            transition: all 0.3s;
+        }
+
+        .user-btn:hover {
+            background: var(--border);
+        }
+
+        .main-content {
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .project-selector {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .project-selector select {
+            padding: 0.75rem 2rem 0.75rem 1rem;
+            font-size: 1.125rem;
+            font-family: 'Ma Shan Zheng', cursive;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%232D2D2D' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+        }
+
+        .project-selector select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .timer-display {
+            text-align: center;
+            padding: 4rem 2rem;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 20px var(--shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .timer-display::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(139, 115, 85, 0.05) 0%, transparent 60%);
+            animation: inkSpread 10s ease-in-out infinite;
+        }
+
+        @keyframes inkSpread {
+            0%, 100% { transform: scale(0.8); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+
+        .timer-display h1 {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: clamp(4rem, 15vw, 8rem);
+            font-weight: normal;
+            color: var(--text-primary);
+            letter-spacing: 0.1em;
+            position: relative;
+            z-index: 1;
+            text-shadow: 2px 2px 4px var(--shadow);
+        }
+
+        .timer-controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-timer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1rem 2rem;
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.25rem;
+            background: #2D2D2D;
+            color: #F5F0E6;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 160px;
+            box-shadow: 0 4px 12px rgba(45, 45, 45, 0.2);
+        }
+
+        .btn-timer svg {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .btn-timer:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(45, 45, 45, 0.3);
+        }
+
+        .btn-timer:active {
+            transform: translateY(-1px);
+        }
+
+        .btn-timer-secondary {
+            background: transparent;
+            border: 2px solid #D4C5B0;
+            color: #2D2D2D;
+            box-shadow: none;
+        }
+
+        .btn-timer-secondary:hover {
+            background: rgba(45, 45, 45, 0.05);
+            border-color: #8B7355;
+            color: #8B7355;
+            box-shadow: none;
+        }
+
+        .btn {
+            padding: 1rem 2.5rem;
+            font-size: 1.125rem;
+            font-family: 'Ma Shan Zheng', cursive;
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 140px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 2px solid var(--text-primary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+            z-index: 100;
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 280px;
+            height: 100%;
+            background: var(--bg-primary);
+            box-shadow: 4px 0 20px var(--shadow);
+            transition: left 0.3s ease;
+            z-index: 101;
+            padding: 1rem 0;
+        }
+
+        .sidebar.active {
+            left: 0;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: flex-end;
+            padding: 0 1rem 1rem;
+        }
+
+        .close-btn {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: var(--text-primary);
+        }
+
+        .sidebar-nav {
+            list-style: none;
+        }
+
+        .sidebar-nav li {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 1.125rem;
+            transition: all 0.3s;
+        }
+
+        .sidebar-nav a:hover,
+        .sidebar-nav a.active {
+            background: var(--bg-secondary);
+            padding-left: 2rem;
+        }
+
+        .sidebar-nav a.active {
+            border-left: 4px solid var(--accent);
+        }
+
+        .nav-icon {
+            margin-right: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+        }
+
+        .nav-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .section-title {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.75rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+            color: var(--text-primary);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.75rem;
+            color: var(--text-primary);
+        }
+
+        .project-list {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .project-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .project-item:last-child {
+            border-bottom: none;
+        }
+
+        .project-name {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.125rem;
+        }
+
+        .project-time {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .history-list {
+            list-style: none;
+        }
+
+        .history-date {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.25rem;
+            padding: 1rem 0 0.5rem;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 0.5rem;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px dashed var(--border);
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .record-project {
+            font-family: 'Ma Shan Zheng', cursive;
+        }
+
+        .record-time {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .record-duration {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.125rem;
+            color: var(--accent);
+        }
+
+        .record-delete {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            opacity: 0.5;
+            transition: all 0.3s;
+        }
+
+        .record-delete:hover {
+            opacity: 1;
+            color: #c0392b;
+        }
+
+        .chart-container {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-title {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (min-width: 768px) {
+            .charts-row {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 250px;
+        }
+
+        .setting-section {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .setting-title {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px dashed var(--border);
+        }
+
+        .setting-item:last-child {
+            border-bottom: none;
+        }
+
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 28px;
+            background: var(--border);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .toggle.active {
+            background: var(--accent);
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .toggle.active::after {
+            left: 24px;
+        }
+
+        .add-project-btn {
+            width: 100%;
+            padding: 1rem;
+            background: transparent;
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.125rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .add-project-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 2rem;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 40px var(--shadow);
+        }
+
+        .modal-title {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1rem;
+            font-family: 'Noto Serif SC', serif;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .modal-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .modal-actions .btn {
+            flex: 1;
+        }
+
+        /* 确认删除弹窗样式 */
+        .confirm-dialog {
+            background: linear-gradient(145deg, #F5F0E6 0%, #EDE6D6 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            width: 85%;
+            max-width: 280px;
+            box-shadow: 0 8px 32px rgba(45, 45, 45, 0.15);
+            border: 1px solid #D4C5B0;
+            text-align: center;
+            animation: confirmFadeIn 0.3s ease;
+        }
+
+        @keyframes confirmFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .confirm-seal {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 1rem;
+        }
+
+        .confirm-seal svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .confirm-title {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.5rem;
+            color: #2D2D2D;
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.1em;
+        }
+
+        .confirm-message {
+            font-size: 0.875rem;
+            color: #5A5A5A;
+            margin-bottom: 1.5rem;
+        }
+
+        .confirm-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .btn-cancel {
+            padding: 0.75rem 1.5rem;
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.125rem;
+            background: transparent;
+            border: 2px solid #D4C5B0;
+            color: #5A5A5A;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 80px;
+        }
+
+        .btn-cancel:hover {
+            border-color: #8B7355;
+            color: #8B7355;
+            transform: translateY(-2px);
+        }
+
+        .btn-confirm {
+            padding: 0.75rem 1.5rem;
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1.125rem;
+            background: #2D2D2D;
+            border: none;
+            color: #F5F0E6;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 80px;
+        }
+
+        .btn-confirm:hover {
+            background: #4A4A4A;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(45, 45, 45, 0.2);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-bar select {
+            padding: 0.5rem 1rem;
+            font-family: inherit;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+
+            .timer-display {
+                padding: 3rem 1rem;
+            }
+
+            .timer-controls {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.875rem;
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-tab {
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.3s;
+        }
+
+        .filter-tab.active {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border-color: var(--text-primary);
+        }
+
+        .recent-records {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            border: 1px solid var(--border);
+        }
+
+        .recent-title {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .data-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .data-btn {
+            flex: 1;
+            padding: 0.75rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            color: var(--text-primary);
+            transition: all 0.3s;
+        }
+
+        .data-btn:hover {
+            background: var(--bg-secondary);
+            border-color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <button class="menu-btn" onclick="toggleSidebar()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <div class="header-actions">
+                <div id="syncStatus" class="sync-status" title="数据同步状态">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+                        <path d="M12 4 L12 8 M12 16 L12 20 M4 12 L8 12 M16 12 L20 12" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </div>
+                <div id="userArea">
+                    <button class="user-btn" onclick="showLoginModal()">云端</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <button class="close-btn" onclick="toggleSidebar()">×</button>
+            </div>
+            <ul class="sidebar-nav">
+                <li><a href="#" class="nav-item active" data-page="timer" onclick="showPage('timer')">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="16" cy="16" r="14" fill="none" stroke="#2D2D2D" stroke-width="1.5" opacity="0.6"/>
+                            <path d="M12 10 L20 10 L16 16 L20 22 L12 22 L16 16 Z" fill="none" stroke="#2D2D2D" stroke-width="1.5"/>
+                            <path d="M14 12 L18 12 L16 15 Z" fill="#2D2D2D" opacity="0.3"/>
+                        </svg>
+                    </span>计时
+                </a></li>
+                <li><a href="#" class="nav-item" data-page="stats" onclick="showPage('stats')">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="16" cy="16" r="14" fill="none" stroke="#2D2D2D" stroke-width="1.5" opacity="0.6"/>
+                            <rect x="8" y="10" width="16" height="12" rx="1.5" fill="none" stroke="#2D2D2D" stroke-width="1.5"/>
+                            <line x1="8" y1="14" x2="24" y2="14" stroke="#2D2D2D" stroke-width="1"/>
+                            <line x1="8" y1="18" x2="24" y2="18" stroke="#2D2D2D" stroke-width="1"/>
+                            <circle cx="11" cy="12" r="1" fill="#2D2D2D"/>
+                            <circle cx="16" cy="16" r="1" fill="#2D2D2D"/>
+                            <circle cx="21" cy="20" r="1" fill="#2D2D2D"/>
+                        </svg>
+                    </span>统计
+                </a></li>
+                <li><a href="#" class="nav-item" data-page="history" onclick="showPage('history')">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="16" cy="16" r="14" fill="none" stroke="#2D2D2D" stroke-width="1.5" opacity="0.6"/>
+                            <rect x="10" y="8" width="12" height="16" rx="1" fill="none" stroke="#2D2D2D" stroke-width="1.5"/>
+                            <line x1="12" y1="12" x2="20" y2="12" stroke="#2D2D2D" stroke-width="1" opacity="0.6"/>
+                            <line x1="12" y1="16" x2="20" y2="16" stroke="#2D2D2D" stroke-width="1" opacity="0.6"/>
+                            <line x1="12" y1="20" x2="17" y2="20" stroke="#2D2D2D" stroke-width="1" opacity="0.6"/>
+                        </svg>
+                    </span>记录
+                </a></li>
+                <li><a href="#" class="nav-item" data-page="trend" onclick="showPage('trend')">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="16" cy="16" r="14" fill="none" stroke="#2D2D2D" stroke-width="1.5" opacity="0.6"/>
+                            <path d="M8 22 L12 16 L16 19 L20 12 L24 18" stroke="#2D2D2D" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                            <ellipse cx="16" cy="23" rx="8" ry="1.5" fill="#2D2D2D" opacity="0.15"/>
+                        </svg>
+                    </span>趋势
+                </a></li>
+                <li><a href="#" class="nav-item" data-page="settings" onclick="showPage('settings')">
+                    <span class="nav-icon">
+                        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="16" cy="16" r="14" fill="none" stroke="#2D2D2D" stroke-width="1.5" opacity="0.6"/>
+                            <circle cx="16" cy="16" r="8" fill="none" stroke="#2D2D2D" stroke-width="1.5"/>
+                            <circle cx="16" cy="16" r="3" fill="#2D2D2D"/>
+                            <line x1="16" y1="8" x2="16" y2="11" stroke="#2D2D2D" stroke-width="1.5"/>
+                            <line x1="16" y1="21" x2="16" y2="24" stroke="#2D2D2D" stroke-width="1.5"/>
+                            <line x1="8" y1="16" x2="11" y2="16" stroke="#2D2D2D" stroke-width="1.5"/>
+                            <line x1="21" y1="16" x2="24" y2="16" stroke="#2D2D2D" stroke-width="1.5"/>
+                        </svg>
+                    </span>设置
+                </a></li>
+            </ul>
+        </nav>
+
+        <main class="main-content">
+            <section id="page-timer" class="page active">
+                <div class="project-selector">
+                    <select id="projectSelect" onchange="switchProject(this.value)">
+                        <option value="">选择项目</option>
+                    </select>
+                </div>
+
+                <div class="timer-display">
+                    <h1 id="timerDisplay">00:00:00</h1>
+                </div>
+
+                <div class="timer-controls">
+                    <button class="btn btn-timer" id="startBtn" onclick="toggleTimer()">
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
+                            <path d="M10 8 L16 12 L10 16 Z" fill="currentColor"/>
+                        </svg>
+                        <span>开始</span>
+                    </button>
+                    <button class="btn btn-timer btn-timer-secondary" onclick="resetTimer()">
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
+                            <circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1"/>
+                            <path d="M12 6 Q16 9 12 12 Q8 9 12 6" fill="currentColor"/>
+                        </svg>
+                        <span>重置</span>
+                    </button>
+                </div>
+            </section>
+
+            <section id="page-stats" class="page">
+                <h2 class="section-title">统计数据</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">今日</div>
+                        <div class="stat-value" id="statToday">00:00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">本周</div>
+                        <div class="stat-value" id="statWeek">00:00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">本月</div>
+                        <div class="stat-value" id="statMonth">00:00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">本年</div>
+                        <div class="stat-value" id="statYear">00:00</div>
+                    </div>
+                </div>
+
+                <h3 class="section-title">项目统计</h3>
+                <div class="project-list" id="projectStats">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📚</div>
+                        <p>暂无练习记录</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="page-history" class="page">
+                <h2 class="section-title">历史记录</h2>
+                
+                <div class="filter-bar">
+                    <select id="filterProject" onchange="renderHistory()">
+                        <option value="">全部项目</option>
+                    </select>
+                    <select id="filterPeriod" onchange="renderHistory()">
+                        <option value="all">全部时间</option>
+                        <option value="week">最近一周</option>
+                        <option value="month">最近一月</option>
+                    </select>
+                </div>
+
+                <div id="historyList">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📜</div>
+                        <p>暂无练习记录</p>
+                        <p style="font-size: 0.875rem;">开始计时来记录你的练字时光吧</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="page-trend" class="page">
+                <h2 class="section-title">趋势分析</h2>
+                
+                <div class="charts-row">
+                    <div class="chart-container">
+                        <h3 class="chart-title">最近7天练习时长</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="weeklyChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <h3 class="chart-title">项目分布</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="projectChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recent-records">
+                    <h4 class="recent-title">最近练习</h4>
+                    <div id="recentRecords">
+                        <p style="color: var(--text-secondary); font-size: 0.875rem;">暂无记录</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="page-settings" class="page">
+                <h2 class="section-title">设置</h2>
+                
+                <div class="setting-section">
+                    <h3 class="setting-title">账号</h3>
+                    <div class="setting-item">
+                        <span id="accountStatus">未登录</span>
+                        <button class="btn" style="padding: 0.5rem 1rem; min-width: auto;" id="loginBtn" onclick="showLoginModal()">登录</button>
+                    </div>
+                </div>
+
+                <div class="setting-section">
+                    <h3 class="setting-title">项目管理</h3>
+                    <div class="project-list" id="projectManagement">
+                        <div class="empty-state">
+                            <p>暂无项目</p>
+                        </div>
+                    </div>
+                    <button class="add-project-btn" onclick="showAddProjectModal()">
+                        + 添加新项目
+                    </button>
+                </div>
+
+                <div class="setting-section">
+                    <h3 class="setting-title">其他设置</h3>
+                    <div class="setting-item">
+                        <span>空格键开始/暂停</span>
+                        <div class="toggle" id="shortcutToggle" onclick="toggleShortcut()"></div>
+                    </div>
+                </div>
+
+                <div class="setting-section">
+                    <h3 class="setting-title">数据管理</h3>
+                    <div class="data-actions">
+                        <button class="data-btn" onclick="exportData()">导出数据</button>
+                        <button class="data-btn" onclick="document.getElementById('importFile').click()">导入数据</button>
+                        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
+                    </div>
+                </div>
+
+                <div class="setting-section">
+                    <h3 class="setting-title">关于</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">练字计时器 v1.0.0</p>
+                    <p style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.5rem;">记录你的练字时光</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="addProjectModal">
+        <div class="modal">
+            <h3 class="modal-title">添加新项目</h3>
+            <input type="text" class="modal-input" id="newProjectName" placeholder="输入项目名称，如：楷书基础">
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('addProjectModal')">取消</button>
+                <button class="btn" onclick="addProject()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="loginModal">
+        <div class="modal">
+            <h3 class="modal-title">数据同步</h3>
+            <div style="text-align: center; margin-bottom: 1.5rem; color: var(--text-secondary);">
+                <svg viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" style="width: 60px; height: 60px; margin-bottom: 1rem;">
+                    <circle cx="25" cy="25" r="20" fill="none" stroke="#8B7355" stroke-width="2"/>
+                    <path d="M25 10 L25 15 M25 35 L25 40 M10 25 L15 25 M35 25 L40 25" stroke="#8B7355" stroke-width="2"/>
+                    <circle cx="25" cy="25" r="8" fill="none" stroke="#8B7355" stroke-width="1.5"/>
+                </svg>
+                <p style="margin-bottom: 0.5rem;">数据已配置云端同步</p>
+                <p style="font-size: 0.875rem; opacity: 0.8;">每次保存数据时会自动同步到云端</p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" style="width: 100%;" onclick="closeModal('loginModal')">知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认删除弹窗 -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="confirm-dialog">
+            <div class="confirm-seal">
+                <svg viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="8" y="8" width="34" height="34" rx="3" stroke="#8B7355" stroke-width="2" fill="none"/>
+                    <text x="25" y="33" font-family="Ma Shan Zheng" font-size="18" fill="#8B7355" text-anchor="middle">慎</text>
+                </svg>
+            </div>
+            <h3 class="confirm-title">是否删除</h3>
+            <p class="confirm-message">删除后数据将无法恢复</p>
+            <div class="confirm-actions">
+                <button class="btn-cancel" onclick="cancelDelete()">不了</button>
+                <button class="btn-confirm" onclick="confirmDelete()">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let timerInterval = null;
+        let seconds = 0;
+        let isRunning = false;
+        let startTime = null;
+        
+        let appData = {
+            currentProject: '',
+            projects: [],
+            settings: {
+                shortcut: false
+            }
+        };
+
+        // JSONBin 配置
+        const JSONBIN_API_KEY = '$2a$10$BhMdKNTZZi3elcTm8zXTAOzv.D8MdtH3WJ.YcbsUF9/3sAfHhBVlu';
+        const JSONBIN_BIN_ID = '6a0318a3250b1311c33b9c94';
+        const JSONBIN_API_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+
+        let weeklyChart = null;
+        let projectChart = null;
+        let syncStatus = 'local'; // 'local' | 'syncing' | 'synced'
+
+        function init() {
+            loadData();
+            updateProjectSelect();
+            updateStats();
+            renderHistory();
+            updateProjectStats();
+            renderCharts();
+            updateRecentRecords();
+            checkLoginStatus();
+            syncFromCloud();
+        }
+
+        // 从云端同步数据
+        async function syncFromCloud() {
+            try {
+                const response = await fetch(JSONBIN_API_URL, {
+                    method: 'GET',
+                    headers: {
+                        'X-Master-Key': JSONBIN_API_KEY
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.record) {
+                        // 合并云端数据到本地
+                        const cloudData = data.record;
+                        const localVersion = localStorage.getItem('maobi_timer_data_version');
+                        
+                        if (!localVersion || cloudData.version > localVersion) {
+                            appData = cloudData.data || appData;
+                            localStorage.setItem('maobi_timer_data', JSON.stringify(appData));
+                            localStorage.setItem('maobi_timer_data_version', cloudData.version || 1);
+                            
+                            updateProjectSelect();
+                            updateStats();
+                            renderHistory();
+                            updateProjectStats();
+                            renderCharts();
+                            updateRecentRecords();
+                        }
+                    }
+                }
+            } catch (error) {
+                console.log('同步失败,使用本地数据');
+            }
+        }
+
+        // 保存数据到云端
+        async function saveToCloud() {
+            try {
+                const localVersion = parseInt(localStorage.getItem('maobi_timer_data_version') || '0');
+                
+                const response = await fetch(JSONBIN_API_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': JSONBIN_API_KEY
+                    },
+                    body: JSON.stringify({
+                        version: localVersion + 1,
+                        data: appData,
+                        updatedAt: new Date().toISOString()
+                    })
+                });
+                
+                if (response.ok) {
+                    localStorage.setItem('maobi_timer_data_version', (localVersion + 1).toString());
+                    return true;
+                }
+            } catch (error) {
+                console.log('保存到云端失败');
+            }
+            return false;
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('maobi_timer_data');
+            if (saved) {
+                appData = JSON.parse(saved);
+            } else {
+                appData.projects = [{ name: '楷书基础', records: [] }];
+                appData.currentProject = '楷书基础';
+                saveData();
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('maobi_timer_data', JSON.stringify(appData));
+            saveToCloud(); // 自动同步到云端
+        }
+
+        function formatTime(totalSeconds) {
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const secs = totalSeconds % 60;
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function formatTimeShort(totalSeconds) {
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            if (hours > 0) {
+                return `${hours}小时${minutes}分`;
+            }
+            return `${minutes}分钟`;
+        }
+
+        function toggleTimer() {
+            if (isRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        }
+
+        function startTimer() {
+            if (!appData.currentProject) {
+                alert('请先选择一个项目');
+                return;
+            }
+            
+            isRunning = true;
+            startTime = new Date();
+            document.getElementById('startBtn').textContent = '暂停';
+            
+            timerInterval = setInterval(() => {
+                seconds++;
+                document.getElementById('timerDisplay').textContent = formatTime(seconds);
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            clearInterval(timerInterval);
+            document.getElementById('startBtn').textContent = '继续';
+        }
+
+        function resetTimer() {
+            if (isRunning) {
+                pauseTimer();
+            }
+            
+            if (seconds > 0 && appData.currentProject) {
+                saveRecord();
+            }
+            
+            seconds = 0;
+            startTime = null;
+            document.getElementById('timerDisplay').textContent = '00:00:00';
+            document.getElementById('startBtn').textContent = '开始';
+        }
+
+        function saveRecord() {
+            const project = appData.projects.find(p => p.name === appData.currentProject);
+            if (!project) return;
+
+            const endTime = new Date();
+            const record = {
+                date: startTime.toISOString().split('T')[0],
+                startTime: startTime.toTimeString().split(' ')[0].substring(0, 5),
+                endTime: endTime.toTimeString().split(' ')[0].substring(0, 5),
+                duration: seconds
+            };
+
+            project.records.push(record);
+            saveData();
+            
+            updateStats();
+            renderHistory();
+            updateProjectStats();
+            renderCharts();
+            updateRecentRecords();
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.getElementById('sidebarOverlay').classList.toggle('active');
+        }
+
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(`page-${pageId}`).classList.add('active');
+            
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.querySelector(`[data-page="${pageId}"]`).classList.add('active');
+            
+            toggleSidebar();
+            
+            if (pageId === 'trend') {
+                setTimeout(renderCharts, 100);
+            }
+        }
+
+        function updateProjectSelect() {
+            const select = document.getElementById('projectSelect');
+            const filter = document.getElementById('filterProject');
+            
+            select.innerHTML = '<option value="">选择项目</option>';
+            filter.innerHTML = '<option value="">全部项目</option>';
+            
+            appData.projects.forEach(p => {
+                select.innerHTML += `<option value="${p.name}" ${p.name === appData.currentProject ? 'selected' : ''}>${p.name}</option>`;
+                filter.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+            });
+        }
+
+        function switchProject(name) {
+            if (seconds > 0 && isRunning) {
+                if (!confirm('切换项目将保存当前练习记录，是否继续？')) {
+                    document.getElementById('projectSelect').value = appData.currentProject;
+                    return;
+                }
+                resetTimer();
+            }
+            
+            appData.currentProject = name;
+            saveData();
+        }
+
+        function updateStats() {
+            const now = new Date();
+            const today = now.toISOString().split('T')[0];
+            const startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() - now.getDay());
+            const weekStart = startOfWeek.toISOString().split('T')[0];
+            const startOfMonth = now.toISOString().substring(0, 7);
+            const year = now.getFullYear();
+
+            let todayTotal = 0;
+            let weekTotal = 0;
+            let monthTotal = 0;
+            let yearTotal = 0;
+
+            appData.projects.forEach(project => {
+                project.records.forEach(record => {
+                    const recordDate = new Date(record.date);
+                    const recordMonth = record.date.substring(0, 7);
+                    const recordYear = recordDate.getFullYear().toString();
+
+                    yearTotal += record.duration;
+
+                    if (recordYear === year) {
+                        yearTotal += record.duration;
+                    }
+                    if (recordMonth === startOfMonth) {
+                        monthTotal += record.duration;
+                    }
+                    if (record.date >= weekStart) {
+                        weekTotal += record.duration;
+                    }
+                    if (record.date === today) {
+                        todayTotal += record.duration;
+                    }
+                });
+            });
+
+            document.getElementById('statToday').textContent = formatTimeShort(todayTotal);
+            document.getElementById('statWeek').textContent = formatTimeShort(weekTotal);
+            document.getElementById('statMonth').textContent = formatTimeShort(monthTotal);
+            document.getElementById('statYear').textContent = formatTimeShort(yearTotal);
+        }
+
+        function updateProjectStats() {
+            const container = document.getElementById('projectStats');
+            
+            if (appData.projects.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>暂无项目</p></div>';
+                return;
+            }
+
+            let html = '';
+            appData.projects.forEach(project => {
+                const total = project.records.reduce((sum, r) => sum + r.duration, 0);
+                const count = project.records.length;
+                
+                html += `
+                    <div class="project-item">
+                        <span class="project-name">${project.name}</span>
+                        <span class="project-time">${formatTimeShort(total)} · ${count}次</span>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('historyList');
+            const filterProject = document.getElementById('filterProject').value;
+            const filterPeriod = document.getElementById('filterPeriod').value;
+
+            let allRecords = [];
+            appData.projects.forEach(project => {
+                if (!filterProject || project.name === filterProject) {
+                    project.records.forEach((record, idx) => {
+                        allRecords.push({
+                            ...record,
+                            projectName: project.name,
+                            recordIndex: idx
+                        });
+                    });
+                }
+            });
+
+            if (filterPeriod === 'week') {
+                const weekAgo = new Date();
+                weekAgo.setDate(weekAgo.getDate() - 7);
+                allRecords = allRecords.filter(r => new Date(r.date) >= weekAgo);
+            } else if (filterPeriod === 'month') {
+                const monthAgo = new Date();
+                monthAgo.setMonth(monthAgo.getMonth() - 1);
+                allRecords = allRecords.filter(r => new Date(r.date) >= monthAgo);
+            }
+
+            allRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            if (allRecords.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📜</div>
+                        <p>暂无练习记录</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<ul class="history-list">';
+            let currentDate = '';
+            
+            allRecords.forEach((record, idx) => {
+                if (record.date !== currentDate) {
+                    currentDate = record.date;
+                    const dateObj = new Date(record.date);
+                    const dateStr = `${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+                    html += `<li class="history-date">${dateStr}</li>`;
+                }
+                
+                html += `
+                    <li class="history-item">
+                        <div>
+                            <span class="record-project">${record.projectName}</span>
+                            <span class="record-time"> ${record.startTime}-${record.endTime}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span class="record-duration">${formatTime(record.duration)}</span>
+                            <button class="record-delete" onclick="deleteRecord('${record.projectName}', ${record.recordIndex})" title="删除">×</button>
+                        </div>
+                    </li>
+                `;
+            });
+            
+            html += '</ul>';
+            container.innerHTML = html;
+        }
+
+        function deleteRecord(projectName, recordIndex) {
+            pendingDelete = { projectName, recordIndex };
+            document.getElementById('confirmModal').classList.add('active');
+        }
+
+        function cancelDelete() {
+            pendingDelete = null;
+            document.getElementById('confirmModal').classList.remove('active');
+        }
+
+        function confirmDelete() {
+            if (pendingDelete) {
+                const { projectName, recordIndex } = pendingDelete;
+                const project = appData.projects.find(p => p.name === projectName);
+                if (project && project.records[recordIndex]) {
+                    project.records.splice(recordIndex, 1);
+                    saveData();
+                    updateStats();
+                    renderHistory();
+                    updateProjectStats();
+                    renderCharts();
+                    updateRecentRecords();
+                }
+                pendingDelete = null;
+            }
+            document.getElementById('confirmModal').classList.remove('active');
+        }
+
+        let pendingDelete = null;
+
+        function renderCharts() {
+            renderWeeklyChart();
+            renderProjectChart();
+        }
+
+        function renderWeeklyChart() {
+            const ctx = document.getElementById('weeklyChart');
+            if (!ctx) return;
+
+            if (weeklyChart) {
+                weeklyChart.destroy();
+            }
+
+            const days = [];
+            const data = [];
+            const labels = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+            
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateStr = date.toISOString().split('T')[0];
+                days.push(dateStr);
+                
+                let dayTotal = 0;
+                appData.projects.forEach(project => {
+                    project.records.forEach(record => {
+                        if (record.date === dateStr) {
+                            dayTotal += record.duration;
+                        }
+                    });
+                });
+                data.push(Math.round(dayTotal / 60));
+            }
+
+            weeklyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: days.map(d => {
+                        const date = new Date(d);
+                        return labels[date.getDay()];
+                    }),
+                    datasets: [{
+                        label: '练习时长(分钟)',
+                        data: data,
+                        backgroundColor: 'rgba(139, 115, 85, 0.7)',
+                        borderColor: 'rgba(139, 115, 85, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderProjectChart() {
+            const ctx = document.getElementById('projectChart');
+            if (!ctx) return;
+
+            if (projectChart) {
+                projectChart.destroy();
+            }
+
+            const projectData = [];
+            appData.projects.forEach(project => {
+                const total = project.records.reduce((sum, r) => sum + r.duration, 0);
+                if (total > 0) {
+                    projectData.push({
+                        name: project.name,
+                        value: Math.round(total / 60)
+                    });
+                }
+            });
+
+            if (projectData.length === 0) {
+                projectData.push({ name: '暂无数据', value: 1 });
+            }
+
+            const colors = [
+                'rgba(139, 115, 85, 0.8)',
+                'rgba(166, 144, 118, 0.8)',
+                'rgba(90, 90, 90, 0.8)',
+                'rgba(212, 197, 176, 0.8)'
+            ];
+
+            projectChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: projectData.map(p => p.name),
+                    datasets: [{
+                        data: projectData.map(p => p.value),
+                        backgroundColor: colors.slice(0, projectData.length),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateRecentRecords() {
+            const container = document.getElementById('recentRecords');
+            let allRecords = [];
+            
+            appData.projects.forEach(project => {
+                project.records.forEach(record => {
+                    allRecords.push({
+                        ...record,
+                        projectName: project.name
+                    });
+                });
+            });
+            
+            allRecords.sort((a, b) => new Date(b.date) - new Date(a.date) || b.startTime.localeCompare(a.startTime));
+            allRecords = allRecords.slice(0, 5);
+
+            if (allRecords.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.875rem;">暂无记录</p>';
+                return;
+            }
+
+            let html = '';
+            allRecords.forEach(record => {
+                const dateObj = new Date(record.date);
+                const dateStr = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+                html += `
+                    <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px dashed var(--border);">
+                        <span>${dateStr} ${record.projectName}</span>
+                        <span style="color: var(--accent);">${formatTimeShort(record.duration)}</span>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function showAddProjectModal() {
+            document.getElementById('addProjectModal').classList.add('active');
+            document.getElementById('newProjectName').value = '';
+            document.getElementById('newProjectName').focus();
+        }
+
+        function addProject() {
+            const name = document.getElementById('newProjectName').value.trim();
+            if (!name) {
+                alert('请输入项目名称');
+                return;
+            }
+            
+            if (appData.projects.some(p => p.name === name)) {
+                alert('项目名称已存在');
+                return;
+            }
+
+            appData.projects.push({ name: name, records: [] });
+            appData.currentProject = name;
+            saveData();
+            
+            updateProjectSelect();
+            updateProjectStats();
+            closeModal('addProjectModal');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function toggleShortcut() {
+            appData.settings.shortcut = !appData.settings.shortcut;
+            document.getElementById('shortcutToggle').classList.toggle('active', appData.settings.shortcut);
+            saveData();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && appData.settings.shortcut) {
+                e.preventDefault();
+                if (document.getElementById('page-timer').classList.contains('active')) {
+                    toggleTimer();
+                }
+            }
+        });
+
+        function exportData() {
+            const dataStr = JSON.stringify(appData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `练字计时器备份_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported.projects && Array.isArray(imported.projects)) {
+                        appData = imported;
+                        saveData();
+                        init();
+                        alert('数据导入成功！');
+                    } else {
+                        alert('数据格式不正确');
+                    }
+                } catch (err) {
+                    alert('导入失败：' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function showLoginModal() {
+            document.getElementById('loginModal').classList.add('active');
+        }
+
+        function loginWithWeixin() {
+            alert('微信登录功能即将上线，敬请期待！');
+            closeModal('loginModal');
+        }
+
+        function loginAsGuest() {
+            alert('已切换到游客模式，数据将保存在本地');
+            closeModal('loginModal');
+        }
+
+        function checkLoginStatus() {
+            const status = document.getElementById('accountStatus');
+            const btn = document.getElementById('loginBtn');
+            if (status) status.textContent = '未登录';
+            if (btn) btn.textContent = '登录';
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
